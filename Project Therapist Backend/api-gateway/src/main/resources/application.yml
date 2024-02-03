@@ -1,0 +1,91 @@
+server:
+  port: 8989
+spring:
+  application:
+    name: GATEWAY-SERVICE
+  cloud:
+    gateway:
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: "${ALLOWED_ORIGINS:http://localhost:5173, http://localhost:4200, http://localhost:3000}"
+#            allowedOrigins: "http://localhost:5173, http://localhost:4200, http://localhost:3000"
+            allowCredentials: true
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "Origin,Authorization,Access-Control-Allow-Origin,Content-Type,Accept,X-Requested-With,Access-Control-Request-Method,Access-Control-Request-Headers"
+            exposedHeaders: "Origin,Content-Type,Accept,Authorization,Access-Control-Allow-Origin,Access-Control-Allow-Origin,Access-Control-Allow-Credentials"
+            maxAge: 3600    
+      routes:
+      - id: USER-SERVICE
+        uri: lb://USER-SERVICE
+        predicates:
+        - Path=/users/**
+        filters:
+        - name: CircuitBreaker
+          args:
+            name: USER-SERVICE
+            fallbackuri: forward:/userFallBack
+      - id: ADMIN-SERVICE
+        uri: lb://ADMIN-SERVICE
+        predicates:
+        - Path=/admins/**
+        filters:
+        - name: CircuitBreaker
+          args:
+            name: ADMIN-SERVICE
+            fallbackuri: forward:/adminFallBack
+      - id: THERAPIST-SERVICE
+        uri: lb://THERAPIST-SERVICE
+        predicates:
+        - Path=/therapists/**
+        filters:
+        - name: CircuitBreaker
+          args:
+            name: therapist-service
+            fallbackuri: forward:/therapistFallBack
+resilience4j:
+  circuitbreaker:
+    instances:
+      USER-SERVICE:
+        slidingWindowSize: 10
+        permittedNumberOfCallsInHalfOpenState: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10000
+        registerHealthIndicator: true
+      ADMIN-SERVICE:
+        slidingWindowSize: 10
+        permittedNumberOfCallsInHalfOpenState: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10000
+        registerHealthIndicator: true
+      therapist-service:
+        slidingWindowSize: 10
+        permittedNumberOfCallsInHalfOpenState: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10000
+        registerHealthIndicator: true
+  timelimiter:
+    instances:
+      USER-SERVICE:
+        timeoutDuration: 5s
+      ADMIN-SERVICE:
+        timeoutDuration: 5s
+      therapist-service:
+        timeoutDuration: 5s
+management:
+  endpoints:
+    web:
+      exposure:
+        include: hystrix.stream, info, health, configprops
+hystrix:
+  command:
+    fallbackcmd:
+      execution:
+        isolation:
+          thread:
+            timeoutInMilliseconds: 60000
